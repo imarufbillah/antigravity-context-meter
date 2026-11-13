@@ -1,0 +1,19 @@
+{
+  "name": "context-meter",
+  "displayName": "Context Meter",
+  "version": "1.1.0",
+  "description": "Zero-token live context window, cost & cache savings, compaction impact, and step-growth monitor for the Antigravity Auxiliary Pane.",
+  "license": "MIT",
+  "logo": "assets/logo.svg",
+  "author": "Maruf Billah",
+  "homepage": "https://github.com/imarufbillah/antigravity-context-meter",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imarufbillah/antigravity-context-meter.git"
+  },
+  "suggestedPrompts": [
+    "Open the Context Meter side panel",
+    "Help me decide whether to /compact this conversation",
+    "Show how to configure a custom per-model context budget"
+  ]
+}

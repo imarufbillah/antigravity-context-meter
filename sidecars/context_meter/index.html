@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none'">
+  <title>Context Meter</title>
+  <script src="/preload.js"></script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="app-title">Context Meter</h1>
+        <span id="conv-badge" class="conv-badge" title="Active conversation ID">—</span>
+      </div>
+
+      <div class="topbar-right">
+        <span id="live-pill" class="live-pill" role="status" aria-live="polite" title="Polling active conversation">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span id="live-label">Live</span>
+        </span>
+
+        <button id="settings-toggle" type="button" class="icon-btn" aria-expanded="false" aria-controls="settings-drawer" aria-label="Configure context budget, warning threshold, and pricing" title="Budget &amp; settings">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>
+          </svg>
+          <span class="btn-label">Budget</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Collapsible Budget, Threshold & Cost Rate Settings -->
+    <section id="settings-drawer" class="surface settings-drawer hidden" aria-label="Context budget, threshold, and pricing settings">
+      <div class="settings-row">
+        <div class="settings-meta">
+          <span class="settings-title">Target Window / Budget</span>
+          <span id="settings-model-hint" class="settings-hint">Saved per model</span>
+        </div>
+        <div id="budget-presets" class="pill-group budget-grid" role="group" aria-label="Context window preset">
+          <button type="button" id="auto-limit-btn" class="seg-btn active budget-auto" data-auto="true">Auto</button>
+          <button type="button" class="seg-btn" data-limit="128000">128k</button>
+          <button type="button" class="seg-btn" data-limit="200000">200k</button>
+          <button type="button" class="seg-btn" data-limit="1000000">1M</button>
+          <label class="custom-limit-wrap" aria-label="Custom context window limit (e.g. 250k, 1.5M, or 250000)">
+            <input id="custom-limit" type="text" inputmode="text" placeholder="Custom" autocomplete="off" spellcheck="false">
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-meta">
+          <span class="settings-title">Warning Threshold</span>
+          <span id="warn-hint" class="settings-hint">Triggers /compact reminder</span>
+        </div>
+        <div id="warn-presets" class="pill-group warn-grid" role="group" aria-label="Warning threshold percentage">
+          <button type="button" class="warn-btn active" data-warn="30">30%</button>
+          <button type="button" class="warn-btn" data-warn="50">50%</button>
+          <button type="button" class="warn-btn" data-warn="70">70%</button>
+          <label id="custom-warn-wrap" class="custom-limit-wrap custom-warn-wrap" aria-label="Custom warning threshold percentage (e.g. 40 or 40%)">
+            <input id="custom-warn" type="text" inputmode="numeric" placeholder="Custom" autocomplete="off" spellcheck="false">
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-meta">
+          <span class="settings-title">Est. Rates ($ / 1M tokens)</span>
+          <span id="rates-hint" class="settings-hint">In · Cache · Out (per model)</span>
+        </div>
+        <div class="rate-inputs">
+          <label class="rate-field" aria-label="Input rate per 1M tokens">
+            <span>In</span>
+            <input id="rate-in" type="number" min="0" step="0.01" placeholder="1.25">
+          </label>
+          <label class="rate-field" aria-label="Cache read rate per 1M tokens">
+            <span>Cache</span>
+            <input id="rate-cache" type="number" min="0" step="0.01" placeholder="0.31">
+          </label>
+          <label class="rate-field" aria-label="Output rate per 1M tokens">
+            <span>Out</span>
+            <input id="rate-out" type="number" min="0" step="0.01" placeholder="10.00">
+          </label>
+          <button type="button" id="rate-reset-btn" class="seg-btn" title="Reset to default model estimate">Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="main">
+      <!-- 1. Primary Context Window Surface (Always First) -->
+      <section class="surface hero-surface" aria-labelledby="ctx-heading">
+        <div class="hero-header">
+          <div class="hero-top-row">
+            <span id="model-name" class="model-name">Detecting model…</span>
+            <span id="status-badge" class="status-badge status-ok" role="status" aria-live="polite">Healthy</span>
+          </div>
+          <div class="hero-meta-row">
+            <span id="model-window-pill" class="chip">1M window</span>
+            <button id="budget-summary-chip" type="button" class="chip chip-btn" aria-expanded="false" aria-controls="settings-drawer" title="Edit target budget or warn threshold">Auto · 30%</button>
+          </div>
+        </div>
+
+        <div class="hero-metric-row">
+          <div class="hero-primary">
+            <h2 id="ctx-heading" class="sr-only">Current Context Window</h2>
+            <span id="ctx-current" class="hero-value">0</span>
+            <span id="ctx-limit-label" class="hero-sub">of 1M (0.0%)</span>
+          </div>
+          <div class="runway-meta">
+            <span id="runway-left" class="runway-item">1M remaining</span>
+            <span id="runway-velocity" class="runway-item hidden">Avg +0 / step</span>
+          </div>
+        </div>
+
+        <div class="meter-wrap">
+          <div id="meter-track" class="meter-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Context window utilization">
+            <div id="seg-cache" class="seg seg-cache"></div>
+            <div id="seg-input" class="seg seg-input"></div>
+            <div id="seg-output" class="seg seg-output"></div>
+            <div id="seg-pending" class="seg seg-pending"></div>
+            <div id="warn-marker" class="warn-marker"></div>
+          </div>
+        </div>
+
+        <div class="legend-row">
+          <span class="legend-item"><i class="dot dot-cache" aria-hidden="true"></i>Cache <b id="leg-cache">0</b></span>
+          <span class="legend-item"><i class="dot dot-input" aria-hidden="true"></i>Input <b id="leg-input">0</b></span>
+          <span class="legend-item"><i class="dot dot-output" aria-hidden="true"></i>Output <b id="leg-output">0</b></span>
+          <span id="leg-pending-wrap" class="legend-item hidden"><i class="dot dot-pending" aria-hidden="true"></i>Pending ~<b id="leg-pending">0</b></span>
+        </div>
+
+        <div id="compact-banner" class="compact-banner hidden" role="alert">
+          <span id="compact-msg" class="compact-msg">Context is getting large. Consider compacting to save tokens.</span>
+          <button id="copy-compact-btn" type="button" class="btn-compact">Copy /compact</button>
+        </div>
+      </section>
+
+      <!-- First-Run / Empty Conversation Onboarding -->
+      <section id="empty-state" class="surface empty-state hidden" aria-label="New conversation ready">
+        <p class="empty-title">Ready to monitor this conversation</p>
+        <p class="empty-desc">Send your first message to inspect exact prompt tokens, cache hit efficiency, estimated cost, and step-by-step growth—at zero extra token cost.</p>
+      </section>
+
+      <!-- 2. Core Daily Telemetry Grid -->
+      <div id="telemetry-grid" class="telemetry-grid">
+        <section class="surface" aria-labelledby="latest-heading">
+          <div class="surface-head">
+            <h2 id="latest-heading" class="surface-title">Latest Model Call</h2>
+            <span id="cache-hit-badge" class="chip">0% cached</span>
+          </div>
+          <dl class="kv-list">
+            <div class="kv-row">
+              <dt>Cache Read</dt>
+              <dd id="st-cache">0</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Fresh Input</dt>
+              <dd id="st-input">0</dd>
+            </div>
+            <div class="kv-row">
+              <dt class="dt-stack">
+                <span>Output</span>
+                <span id="st-output-split" class="kv-sub hidden">Think 0 · Resp 0</span>
+              </dt>
+              <dd id="st-output">0</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Step Delta</dt>
+              <dd id="st-delta">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="surface" aria-labelledby="session-heading">
+          <div class="surface-head">
+            <h2 id="session-heading" class="surface-title">Session Burn</h2>
+            <span id="session-cache-badge" class="chip">0% cache hit</span>
+          </div>
+          <dl class="kv-list">
+            <div class="kv-row">
+              <dt>Non-Cached (In + Out)</dt>
+              <dd id="cum-noncached">0</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Total Cache Reads</dt>
+              <dd id="cum-cache">0</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Thinking / Response</dt>
+              <dd id="cum-output-split">—</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Turns / Tools / Compacts</dt>
+              <dd id="cum-turns">0 / 0 / 0</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <!-- 3. Interactive Context Growth Chart -->
+      <section class="surface chart-surface" aria-labelledby="growth-heading">
+        <div class="surface-head">
+          <h2 id="growth-heading" class="surface-title">Context Growth</h2>
+          <div class="scale-switch" role="group" aria-label="Chart vertical scale">
+            <button type="button" id="scale-fit-btn" class="scale-btn active" data-scale="fit">Fit</button>
+            <button type="button" id="scale-win-btn" class="scale-btn" data-scale="window">Window</button>
+          </div>
+        </div>
+
+        <div id="chart-inspector" class="chart-inspector" aria-live="polite">
+          <span class="inspector-hint">Hover or tab through bars to inspect step telemetry</span>
+        </div>
+
+        <div id="chart-wrap" class="chart-wrap">
+          <div id="chart-empty" class="chart-empty">Waiting for first model response…</div>
+          <div id="chart-canvas" class="chart-canvas hidden">
+            <div class="y-axis" aria-hidden="true">
+              <span id="y-max">0</span>
+              <span id="y-mid">0</span>
+              <span>0</span>
+            </div>
+            <svg id="chart-svg" class="chart-svg" viewBox="0 0 420 112" preserveAspectRatio="none" aria-label="Context growth over model steps"></svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Deep-Dive Diagnostics (Below the fold on scroll) -->
+      <div id="deep-grid" class="telemetry-grid">
+        <!-- Estimated Cost & Cache Savings -->
+        <section class="surface" aria-labelledby="cost-heading">
+          <div class="surface-head">
+            <h2 id="cost-heading" class="surface-title">Est. Cost &amp; Cache Savings</h2>
+            <button id="rate-summary-chip" type="button" class="chip chip-btn" aria-expanded="false" aria-controls="settings-drawer" title="Edit estimated $/1M token rates">Est. rates</button>
+          </div>
+          <dl class="kv-list">
+            <div class="kv-row">
+              <dt class="dt-stack">
+                <span>Est. Session Spend</span>
+                <span id="cost-with-sub-note" class="kv-sub hidden">Incl. subagents: —</span>
+              </dt>
+              <dd id="cost-spend">$0.00</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Saved by Cache</dt>
+              <dd id="cost-saved" class="val-positive">$0.00</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Est. Cost / Turn</dt>
+              <dd id="cost-per-turn">$0.00</dd>
+            </div>
+          </dl>
+        </section>
+
+        <!-- Compaction Impact History -->
+        <section class="surface" aria-labelledby="compacts-heading">
+          <div class="surface-head">
+            <h2 id="compacts-heading" class="surface-title">Compaction Impact</h2>
+            <span id="compacts-count-pill" class="chip">0 events</span>
+          </div>
+          <div id="compacts-empty" class="quiet-empty">No compactions detected yet in this conversation.</div>
+          <ul id="compacts-list" class="event-list hidden"></ul>
+        </section>
+      </div>
+
+      <!-- Top Context Hogs -->
+      <section id="hogs-surface" class="surface" aria-labelledby="hogs-heading">
+        <div class="surface-head">
+          <h2 id="hogs-heading" class="surface-title">Top Context Hogs</h2>
+          <span class="muted-meta">Largest step spikes</span>
+        </div>
+        <div id="hogs-empty" class="quiet-empty">Largest tool outputs and prompt spikes will appear as the chat grows.</div>
+        <ul id="hogs-list" class="hog-list hidden"></ul>
+      </section>
+
+      <!-- Subagent & Swarm Total Burn -->
+      <section id="subagents-surface" class="surface" aria-labelledby="subagents-heading">
+        <div class="surface-head">
+          <div class="head-left">
+            <h2 id="subagents-heading" class="surface-title">Subagent &amp; Swarm Burn</h2>
+            <span id="subagents-count-pill" class="chip">0 agents</span>
+          </div>
+          <span id="subagents-total-pill" class="muted-meta"></span>
+        </div>
+        <div id="subagents-empty" class="quiet-empty">No subagents or swarm workers spawned from this conversation.</div>
+        <div id="subagents-content" class="hidden">
+          <dl class="kv-list subagents-totals">
+            <div class="kv-row">
+              <dt>Combined Non-Cached (Chat + Subagents)</dt>
+              <dd id="sub-combined-noncached">0</dd>
+            </div>
+            <div class="kv-row">
+              <dt>Combined Cache Reads</dt>
+              <dd id="sub-combined-cache">0</dd>
+            </div>
+          </dl>
+          <ul id="subagents-list" class="subagent-list"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

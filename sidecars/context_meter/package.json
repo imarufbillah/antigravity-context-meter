@@ -1,0 +1,6 @@
+{
+  "name": "context_meter",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Live zero-token context window and token usage monitor sidecar"
+}
