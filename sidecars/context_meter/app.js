@@ -948,17 +948,6 @@
     { passive: true },
   );
 
-  $('copy-compact-btn').addEventListener('click', async () => {
-    const btn = $('copy-compact-btn');
-    try {
-      await navigator.clipboard.writeText('/compact');
-      btn.textContent = 'Copied!';
-      setTimeout(() => { btn.textContent = 'Copy /compact'; }, 1400);
-    } catch {
-      btn.textContent = 'Type /compact';
-    }
-  });
-
   async function poll() {
     try {
       const conv = currentConv();

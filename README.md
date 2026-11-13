@@ -18,7 +18,7 @@ Context Meter runs as an Auxiliary Pane UI sidecar (`SIDECAR_UI_ENTRYPOINT_AUX_P
 
 - **Auto Model & Window Detection:** Identifies the active conversation's model (`Gemini`, `Claude`, `GPT-OSS`, etc.), applies the model's context window automatically, and supports custom per-model budgets.
 - **Segmented Context Gauge:** Visualizes `Cache Read`, `Fresh Input`, `Output`, and in-flight `Pending` tokens against your warning threshold with headroom and burn-velocity (`Avg / step`) metrics.
-- **One-Click `/compact` Prompting:** Displays an in-panel reminder with a one-click `Copy /compact` action whenever context crosses your configured warning threshold (defaults to `30%`).
+- **`/compact` Threshold Reminder:** Displays an in-panel warning banner whenever context crosses your configured warning threshold (defaults to `30%`).
 - **Latest Call & Session Burn:** Tracks latest cache hit rate, cumulative non-cached vs. cache-read tokens, `Thinking / Response` output split, and `Turns / Tools / Compacts`.
 - **Interactive Context Growth Chart:** Inspect step-by-step context growth, compaction drops, warning threshold line, and tool activity with `Fit` (auto-scaled) and `Window` (full-scale) modes.
 - **Est. Cost & Cache Savings:** Estimates session spend (including child subagents), cache savings, and average cost per turn using customizable per-model `In / Cache / Out` rates (`$/1M tokens`).
